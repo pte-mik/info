@@ -32,6 +32,9 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
+      # The engine resolves its own dependencies from its checkout.
+      - run: bun install --frozen-lockfile
+        working-directory: book-md
       - run: bun install --frozen-lockfile
         working-directory: info
       - run: bun run check
