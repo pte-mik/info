@@ -10,7 +10,7 @@ bun run build    # static site in build/
 ```
 
 - `portal.config.ts` – title, content root, entry file, base path.
-- `content/courses.md` – course registry; `content/demo/` – a minimal demo course.
+- `content/courses.md` – the course registry. The courses live in `laborci/books` (a private repository, read through the BookMD GitHub App) and are published with the author's approval (`publish: true`).
 - Course authors can check a local folder at `/@dev` (local course preview) without running anything.
 
 ## Engine
