@@ -1,18 +1,49 @@
 name: Publish site
 on:
+  # Hourly trigger; the gate job applies the Hungarian update window (see ci/gate.ts).
+  schedule:
+    - cron: '17 * * * *'
   push:
     branches: [main]
   workflow_dispatch:
+    inputs:
+      force:
+        description: Rebuild and publish even if nothing changed
+        type: boolean
+        default: false
 permissions:
   contents: read
-  pages: write
-  id-token: write
+# Runs never overlap and an interrupted run cannot lose a deploy; a newer queued run replaces older queued ones.
 concurrency:
   group: pages
-  cancel-in-progress: true
+  cancel-in-progress: false
 jobs:
-  build:
+  gate:
     runs-on: ubuntu-latest
+    outputs:
+      run: ${{ steps.gate.outputs.run }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: ci
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - run: bun test ci
+      - id: gate
+        run: bun ci/gate.ts
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+
+  build:
+    needs: gate
+    if: needs.gate.outputs.run == 'true'
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: read
+    outputs:
+      changed: ${{ steps.plan.outputs.changed }}
     steps:
       - uses: actions/checkout@v4
         with:
@@ -37,18 +68,69 @@ jobs:
         working-directory: book-md
       - run: bun install --frozen-lockfile
         working-directory: info
-      - run: bun run check
+
+      # The baseline is the plan of the last successful deployment; it exists only as an artifact that
+      # was uploaded after a deploy succeeded. Missing or expired means a full build.
+      - name: Fetch baseline
         working-directory: info
-      - run: bun run build
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=publish-baseline&per_page=20" \
+            --jq '[.artifacts[] | select(.expired == false)] | .[0].id // empty' || true)
+          if [ -n "$id" ] && gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > baseline.zip && unzip -qo baseline.zip -d baseline; then
+            echo "Baseline artifact $id downloaded."
+          else
+            echo "No usable baseline artifact."
+          fi
+      - name: Plan
+        id: plan
+        working-directory: info
+        env:
+          FORCE: ${{ inputs.force }}
+        run: |
+          set -o pipefail
+          args=""
+          if [ "$FORCE" = "true" ]; then args="--force"; fi
+          bunx bookmd plan --instance-commit "$GITHUB_SHA" --engine-commit "$(git -C ../book-md rev-parse HEAD)" \
+            --baseline baseline/plan.json --out plan.json $args | tee plan.log
+          {
+            if [ "$(grep -c '^Changed' plan.log)" = "1" ]; then echo "**Publishing:** $(grep '^Changed' plan.log)"; else echo "**No changes since the last publication:** nothing was built or deployed."; fi
+            echo
+            echo '```'; grep -v '^Changed\|^Unchanged' plan.log; echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      # From here on, exactly the planned commits are built.
+      - if: steps.plan.outputs.changed == 'true'
+        run: bunx bookmd check --sources plan.json
         working-directory: info
         env:
           BASE_PATH: /info
-      - uses: actions/upload-pages-artifact@v3
+      - if: steps.plan.outputs.changed == 'true'
+        run: bunx bookmd build --sources plan.json
+        working-directory: info
+        env:
+          BASE_PATH: /info
+      - if: steps.plan.outputs.changed == 'true'
+        uses: actions/upload-pages-artifact@v3
         with:
           path: info/build
+      - if: steps.plan.outputs.changed == 'true'
+        uses: actions/upload-artifact@v4
+        with:
+          name: publish-plan
+          path: info/plan.json
+          retention-days: 1
+      - if: failure()
+        run: echo "**Failed:** nothing was deployed and the previous site stays online." >> "$GITHUB_STEP_SUMMARY"
+
   deploy:
     needs: build
+    if: needs.build.outputs.changed == 'true'
     runs-on: ubuntu-latest
+    permissions:
+      pages: write
+      id-token: write
     environment:
       name: github-pages
       url: ${{ steps.deployment.outputs.page_url }}
@@ -56,3 +138,20 @@ jobs:
       - name: Deploy
         id: deployment
         uses: actions/deploy-pages@v4
+
+  # The baseline moves only after a successful deploy.
+  baseline:
+    needs: deploy
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/download-artifact@v4
+        with:
+          name: publish-plan
+      - uses: actions/upload-artifact@v4
+        with:
+          name: publish-baseline
+          path: plan.json
+          retention-days: 90
+      - run: echo "**Published.** Baseline recorded for the next run." >> "$GITHUB_STEP_SUMMARY"
