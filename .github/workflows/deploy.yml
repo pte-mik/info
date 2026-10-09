@@ -1,0 +1,55 @@
+name: Publish site
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+concurrency:
+  group: pages
+  cancel-in-progress: true
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: info
+      # The engine is private and unreleased; it sits beside the instance, as package.json expects.
+      # The token is used only by this step and is not persisted in the checkout.
+      - uses: actions/checkout@v4
+        with:
+          repository: atom-forge/bookmd
+          ref: engine
+          token: ${{ secrets.BOOKMD_TOKEN }}
+          path: book-md
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.0'
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+      - run: bun install --frozen-lockfile
+        working-directory: info
+      - run: bun run check
+        working-directory: info
+      - run: bun run build
+        working-directory: info
+        env:
+          BASE_PATH: /info
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: info/build
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - name: Deploy
+        id: deployment
+        uses: actions/deploy-pages@v4
