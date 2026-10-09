@@ -69,6 +69,19 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: info
 
+      # Private course sources need the BookMD GitHub App. A public repository's logs and artifacts are public and
+      # would show private repository names, so credentials are refused there.
+      - name: Guard private sources
+        env:
+          GH_TOKEN: ${{ github.token }}
+          HAS_APP: ${{ secrets.BOOKMD_APP_ID != '' }}
+        run: |
+          private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)
+          if [ "$HAS_APP" = "true" ] && [ "$private" != "true" ]; then
+            echo "::error::GitHub App credentials are configured, but this repository is public. Make it private first, or remove BOOKMD_APP_ID and BOOKMD_APP_PRIVATE_KEY."
+            exit 1
+          fi
+
       # The baseline is the plan of the last successful deployment; it exists only as an artifact that
       # was uploaded after a deploy succeeded. The list is not ordered by age, so the newest is picked explicitly.
       # Missing or expired means a full build.
@@ -89,6 +102,8 @@ jobs:
         working-directory: info
         env:
           FORCE: ${{ inputs.force }}
+          BOOKMD_APP_ID: ${{ secrets.BOOKMD_APP_ID }}
+          BOOKMD_APP_PRIVATE_KEY: ${{ secrets.BOOKMD_APP_PRIVATE_KEY }}
         run: |
           set -o pipefail
           args=""
@@ -100,6 +115,15 @@ jobs:
             echo
             echo '```'; grep -v '^Changed\|^Unchanged' plan.log; echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
+
+      # Sources are read in this step only. The steps below get no credentials and work from the downloaded commits.
+      - if: steps.plan.outputs.changed == 'true'
+        name: Download sources
+        run: bunx bookmd sources --sources plan.json
+        working-directory: info
+        env:
+          BOOKMD_APP_ID: ${{ secrets.BOOKMD_APP_ID }}
+          BOOKMD_APP_PRIVATE_KEY: ${{ secrets.BOOKMD_APP_PRIVATE_KEY }}
 
       # From here on, exactly the planned commits are built.
       - if: steps.plan.outputs.changed == 'true'
