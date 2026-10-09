@@ -1,0 +1,15 @@
+{
+  "name": "pte-mik-info",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "content": "bookmd content",
+    "dev": "bookmd dev",
+    "build": "bookmd build",
+    "preview": "bookmd preview",
+    "check": "bookmd check"
+  },
+  "dependencies": {
+    "@atom-forge/bookmd": "file:../book-md/packages/bookmd"
+  }
+}
