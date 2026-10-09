@@ -48,24 +48,12 @@ jobs:
       - uses: actions/checkout@v4
         with:
           path: info
-      # The engine is private and unreleased; it sits beside the instance, as package.json expects.
-      # The token is used only by this step and is not persisted in the checkout.
-      - uses: actions/checkout@v4
-        with:
-          repository: atom-forge/bookmd
-          ref: engine
-          token: ${{ secrets.BOOKMD_TOKEN }}
-          path: book-md
-          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: '1.4.0'
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      # The engine resolves its own dependencies from its checkout.
-      - run: bun install --frozen-lockfile
-        working-directory: book-md
       - run: bun install --frozen-lockfile
         working-directory: info
 
@@ -107,7 +95,7 @@ jobs:
           set -o pipefail
           args=""
           if [ "$FORCE" = "true" ]; then args="--force"; fi
-          bunx bookmd plan --instance-commit "$GITHUB_SHA" --engine-commit "$(git -C ../book-md rev-parse HEAD)" \
+          bunx bookmd plan --instance-commit "$GITHUB_SHA" \
             --baseline baseline/plan.json --out plan.json $args | tee plan.log
           {
             if [ "$(grep -c '^Changed' plan.log)" = "1" ]; then echo "**Publishing:** $(grep '^Changed' plan.log)"; else echo "**No changes since the last publication:** nothing was built or deployed."; fi

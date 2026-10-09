@@ -13,6 +13,8 @@ bun run build    # static site in build/
 - `content/courses.md` – course registry; `content/demo/` – a minimal demo course.
 - Course authors can check a local folder at `/@dev` (local course preview) without running anything.
 
-## Engine dependency (temporary)
+## Engine
 
-The engine package is not published yet. `package.json` points at a sibling checkout of the engine repository (`../book-md/packages/bookmd`); clone it next to this repository before `bun install`. This will change to a versioned dependency once the package is released.
+The engine is the published [`@atom-forge/bookmd`](https://www.npmjs.com/package/@atom-forge/bookmd) package; its version is pinned by `bun.lock`. Upgrade it with `bun update @atom-forge/bookmd`, then run `bun run check` and `bun run build`.
+
+Private course sources are read with the "PTE MIK BookMD reader" GitHub App (`BOOKMD_APP_ID`, `BOOKMD_APP_PRIVATE_KEY` Actions secrets); public sources need no credentials.
