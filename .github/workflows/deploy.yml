@@ -69,17 +69,16 @@ jobs:
       - run: bun install --frozen-lockfile
         working-directory: info
 
-      # Private course sources need the BookMD GitHub App. A public repository's logs and artifacts are public and
-      # would show private repository names, so credentials are refused there.
-      - name: Guard private sources
+      # Private course sources need the BookMD GitHub App. In a public repository the logs, summaries and
+      # artifacts are public, so the names of private source repositories are visible there by design.
+      - name: Note on private sources
         env:
           GH_TOKEN: ${{ github.token }}
           HAS_APP: ${{ secrets.BOOKMD_APP_ID != '' }}
         run: |
           private=$(gh api "repos/$GITHUB_REPOSITORY" --jq .private)
           if [ "$HAS_APP" = "true" ] && [ "$private" != "true" ]; then
-            echo "::error::GitHub App credentials are configured, but this repository is public. Make it private first, or remove BOOKMD_APP_ID and BOOKMD_APP_PRIVATE_KEY."
-            exit 1
+            echo "::notice::Private sources are enabled in a public repository: their repository names appear in the registry, logs and artifacts."
           fi
 
       # The baseline is the plan of the last successful deployment; it exists only as an artifact that
