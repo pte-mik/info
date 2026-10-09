@@ -70,14 +70,15 @@ jobs:
         working-directory: info
 
       # The baseline is the plan of the last successful deployment; it exists only as an artifact that
-      # was uploaded after a deploy succeeded. Missing or expired means a full build.
+      # was uploaded after a deploy succeeded. The list is not ordered by age, so the newest is picked explicitly.
+      # Missing or expired means a full build.
       - name: Fetch baseline
         working-directory: info
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
           id=$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=publish-baseline&per_page=20" \
-            --jq '[.artifacts[] | select(.expired == false)] | .[0].id // empty' || true)
+            --jq '[.artifacts[] | select(.expired == false)] | sort_by(.created_at) | last | .id // empty' || true)
           if [ -n "$id" ] && gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$id/zip" > baseline.zip && unzip -qo baseline.zip -d baseline; then
             echo "Baseline artifact $id downloaded."
           else
