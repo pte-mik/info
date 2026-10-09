@@ -2,7 +2,7 @@ name: Publish site
 on:
   # Hourly trigger; the gate job applies the Hungarian update window (see ci/gate.ts).
   schedule:
-    - cron: '17 * * * *'
+    - cron: '23 * * * *'
   push:
     branches: [main]
   workflow_dispatch:
