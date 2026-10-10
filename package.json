@@ -11,6 +11,6 @@
     "test": "bun test ci"
   },
   "dependencies": {
-    "@atom-forge/bookmd": "^0.1.3"
+    "@atom-forge/bookmd": "^0.1.4"
   }
 }
