@@ -1,5 +1,5 @@
 ---
-courses:
+books:
   - "main@github.com/laborci/books/programming-5-hu/course.md"
   - "main@github.com/laborci/books/programming-5-en/course.md"
   - "main@github.com/laborci/books/ux-ui-hu/course.md"

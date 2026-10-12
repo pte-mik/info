@@ -54,7 +54,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: '24'
-      - run: bun install --frozen-lockfile
+      - run: bun install
         working-directory: info
 
       # Private course sources need the BookMD GitHub App. In a public repository the logs, summaries and
@@ -106,7 +106,7 @@ jobs:
       # Sources are read in this step only. The steps below get no credentials and work from the downloaded commits.
       - if: steps.plan.outputs.changed == 'true'
         name: Download sources
-        run: bunx bookmd sources --sources plan.json
+        run: bunx bookmd sources --sources plan.json --baseline baseline/plan.json
         working-directory: info
         env:
           BOOKMD_APP_ID: ${{ secrets.BOOKMD_APP_ID }}
@@ -114,12 +114,12 @@ jobs:
 
       # From here on, exactly the planned commits are built.
       - if: steps.plan.outputs.changed == 'true'
-        run: bunx bookmd check --sources plan.json
+        run: bunx bookmd check --sources plan.json --baseline baseline/plan.json
         working-directory: info
         env:
           BASE_PATH: /info
       - if: steps.plan.outputs.changed == 'true'
-        run: bunx bookmd build --sources plan.json
+        run: bunx bookmd build --sources plan.json --baseline baseline/plan.json
         working-directory: info
         env:
           BASE_PATH: /info
